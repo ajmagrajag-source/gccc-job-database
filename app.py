@@ -58,36 +58,6 @@ JOB_TYPE_ORDER = [
     "Parkour"
 ]
 
-# Function to create toggle buttons for filters
-def create_filter_buttons(options, key_prefix, selected_options=None):
-    """Create toggle buttons for filtering options"""
-    if selected_options is None:
-        selected_options = []
-    
-    cols = st.columns(len(options))
-    selected = selected_options.copy()
-    
-    for i, option in enumerate(options):
-        with cols[i]:
-            # Check if this option is currently selected
-            is_selected = option in selected
-            button_color = "primary" if is_selected else "secondary"
-            
-            # Create a unique key for each button
-            button_key = f"{key_prefix}_{option.replace(' ', '_')}"
-            
-            # Display the button
-            if st.button(option, key=button_key, type=button_color, use_container_width=True):
-                # Toggle selection
-                if is_selected:
-                    selected.remove(option)
-                else:
-                    selected.append(option)
-                # Rerun to update the UI
-                st.rerun()
-    
-    return selected
-
 # Main app
 st.title("🎮 Rockstar Social Club Jobs Database")
 st.markdown("Browse and search through scraped Rockstar job data")
@@ -109,35 +79,64 @@ if 'selected_verification_types' not in st.session_state:
     st.session_state.selected_verification_types = []
 if 'selected_years' not in st.session_state:
     st.session_state.selected_years = []
-
-# Sidebar for filters
-st.sidebar.header("Filters")
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = 1
 
 # Get unique values for filters
 job_types = [x for x in JOB_TYPE_ORDER if x in df['job_type_edited'].unique()]
 verification_types = sorted([x for x in df['verification_type'].unique() if pd.notna(x)])
 years = sorted([str(x) for x in df['creation_year'].unique() if pd.notna(x)], reverse=True)
 
-# Job Type Filter Buttons
-st.sidebar.subheader("Job Types")
-st.session_state.selected_job_types = create_filter_buttons(
-    job_types, "job_type", st.session_state.selected_job_types
-)
-
-# Verification Type Filter Buttons
-st.sidebar.subheader("Verification Types")
-st.session_state.selected_verification_types = create_filter_buttons(
-    verification_types, "verification_type", st.session_state.selected_verification_types
-)
-
-# Year Filter Buttons
-st.sidebar.subheader("Years")
-st.session_state.selected_years = create_filter_buttons(
-    years, "year", st.session_state.selected_years
-)
+# Create filter section
+st.markdown("## Filters")
 
 # Search bar
-search_term = st.sidebar.text_input("Search by job name or creator")
+search_term = st.text_input("Search by job name or creator")
+
+# Job Type Filter
+st.markdown("### Job Type")
+job_type_cols = st.columns(min(5, len(job_types)))
+for i, job_type in enumerate(job_types):
+    with job_type_cols[i % len(job_type_cols)]:
+        is_selected = job_type in st.session_state.selected_job_types
+        if st.button(job_type, key=f"job_type_{job_type}", use_container_width=True, type="primary" if is_selected else "secondary"):
+            if is_selected:
+                st.session_state.selected_job_types.remove(job_type)
+            else:
+                st.session_state.selected_job_types.append(job_type)
+            st.rerun()
+
+st.markdown("---")
+
+# Verification Type Filter
+st.markdown("### Verification Types")
+verification_cols = st.columns(min(3, len(verification_types)))
+for i, verification_type in enumerate(verification_types):
+    with verification_cols[i % len(verification_cols)]:
+        is_selected = verification_type in st.session_state.selected_verification_types
+        if st.button(verification_type, key=f"verification_{verification_type}", use_container_width=True, type="primary" if is_selected else "secondary"):
+            if is_selected:
+                st.session_state.selected_verification_types.remove(verification_type)
+            else:
+                st.session_state.selected_verification_types.append(verification_type)
+            st.rerun()
+
+st.markdown("---")
+
+# Year Filter
+st.markdown("### Years")
+year_cols = st.columns(min(5, len(years)))
+for i, year in enumerate(years):
+    with year_cols[i % len(year_cols)]:
+        is_selected = year in st.session_state.selected_years
+        if st.button(year, key=f"year_{year}", use_container_width=True, type="primary" if is_selected else "secondary"):
+            if is_selected:
+                st.session_state.selected_years.remove(year)
+            else:
+                st.session_state.selected_years.append(year)
+            st.rerun()
+
+st.markdown("---")
 
 # Main content area
 tab1, tab2 = st.tabs(["Browse All Jobs", "Random Job Discovery"])
@@ -150,8 +149,12 @@ with tab1:
         st.subheader("Browse Jobs")
     
     with header_col2:
-        # Apply filters button
-        if st.button("Apply Filters", use_container_width=True):
+        # Clear filters button
+        if st.button("Clear Filters", use_container_width=True):
+            st.session_state.selected_job_types = []
+            st.session_state.selected_verification_types = []
+            st.session_state.selected_years = []
+            st.session_state.current_page = 1
             st.rerun()
     
     # Apply filters
@@ -184,8 +187,8 @@ with tab1:
         page_col1, page_col2, page_col3 = st.columns([1, 2, 1])
         
         with page_col1:
-            if st.button("← Previous", disabled=st.session_state.get('current_page', 1) <= 1):
-                st.session_state.current_page = max(1, st.session_state.get('current_page', 1) - 1)
+            if st.button("← Previous", disabled=st.session_state.current_page <= 1):
+                st.session_state.current_page = max(1, st.session_state.current_page - 1)
                 st.rerun()
         
         with page_col2:
@@ -193,14 +196,17 @@ with tab1:
                 "Page", 
                 min_value=1, 
                 max_value=total_pages, 
-                value=st.session_state.get('current_page', 1),
+                value=st.session_state.current_page,
                 key="page_input"
             )
-            st.session_state.current_page = current_page
+            # Update session state if page number changes
+            if current_page != st.session_state.current_page:
+                st.session_state.current_page = current_page
+                st.rerun()
         
         with page_col3:
-            if st.button("Next →", disabled=st.session_state.get('current_page', 1) >= total_pages):
-                st.session_state.current_page = min(total_pages, st.session_state.get('current_page', 1) + 1)
+            if st.button("Next →", disabled=st.session_state.current_page >= total_pages):
+                st.session_state.current_page = min(total_pages, st.session_state.current_page + 1)
                 st.rerun()
         
         # Get current page data
@@ -263,21 +269,17 @@ with tab1:
 with tab2:
     st.subheader("Random Job Discovery")
     
-    # Create columns for filter controls
-    filter_col1, filter_col2 = st.columns([1, 1])
-    
-    with filter_col1:
-        discovery_job_types = st.multiselect("Filter by Job Types", job_types, key="discovery_job")
-    
-    with filter_col2:
-        discovery_verification = st.multiselect("Filter by Verification", verification_types, key="discovery_ver")
-    
-    discovery_years = st.multiselect("Filter by Years", years, key="discovery_year")
-    
+    # Use the same filters as the main page
     num_jobs = st.slider("Number of random jobs to show", min_value=1, max_value=30, value=12)
     
     if st.button("🎲 Get Random Jobs"):
-        random_jobs = get_random_jobs(df, num_jobs, discovery_job_types, discovery_verification, discovery_years)
+        random_jobs = get_random_jobs(
+            df, 
+            num_jobs, 
+            st.session_state.selected_job_types,
+            st.session_state.selected_verification_types,
+            st.session_state.selected_years
+        )
         
         if not random_jobs.empty:
             st.success(f"Found {len(random_jobs)} random jobs!")
