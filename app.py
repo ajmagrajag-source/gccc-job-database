@@ -44,6 +44,50 @@ def get_random_jobs(df, n=12, job_type_filters=None, verification_filters=None, 
     sample_size = min(n, len(filtered_df))
     return filtered_df.sample(n=sample_size)
 
+# Custom order for job types
+JOB_TYPE_ORDER = [
+    "GP and Street",
+    "Off Road", 
+    "Race",
+    "Stunt Race",
+    "Banger Race",
+    "Deathmatch",
+    "Last Team Standing",
+    "King of the Hill",
+    "Other",
+    "Parkour"
+]
+
+# Function to create toggle buttons for filters
+def create_filter_buttons(options, key_prefix, selected_options=None):
+    """Create toggle buttons for filtering options"""
+    if selected_options is None:
+        selected_options = []
+    
+    cols = st.columns(len(options))
+    selected = selected_options.copy()
+    
+    for i, option in enumerate(options):
+        with cols[i]:
+            # Check if this option is currently selected
+            is_selected = option in selected
+            button_color = "primary" if is_selected else "secondary"
+            
+            # Create a unique key for each button
+            button_key = f"{key_prefix}_{option.replace(' ', '_')}"
+            
+            # Display the button
+            if st.button(option, key=button_key, type=button_color, use_container_width=True):
+                # Toggle selection
+                if is_selected:
+                    selected.remove(option)
+                else:
+                    selected.append(option)
+                # Rerun to update the UI
+                st.rerun()
+    
+    return selected
+
 # Main app
 st.title("🎮 Rockstar Social Club Jobs Database")
 st.markdown("Browse and search through scraped Rockstar job data")
@@ -58,18 +102,39 @@ if df.empty:
 # Extract year from creation_date for filtering
 df['creation_year'] = pd.to_datetime(df['creation_date'], errors='coerce').dt.year.astype('Int64').astype(str)
 
+# Initialize session state for filters
+if 'selected_job_types' not in st.session_state:
+    st.session_state.selected_job_types = []
+if 'selected_verification_types' not in st.session_state:
+    st.session_state.selected_verification_types = []
+if 'selected_years' not in st.session_state:
+    st.session_state.selected_years = []
+
 # Sidebar for filters
 st.sidebar.header("Filters")
 
 # Get unique values for filters
-job_types = sorted([x for x in df['job_type_edited'].unique() if pd.notna(x)])
+job_types = [x for x in JOB_TYPE_ORDER if x in df['job_type_edited'].unique()]
 verification_types = sorted([x for x in df['verification_type'].unique() if pd.notna(x)])
 years = sorted([str(x) for x in df['creation_year'].unique() if pd.notna(x)], reverse=True)
 
-# Multi-select filters
-selected_job_types = st.sidebar.multiselect("Job Types", job_types)
-selected_verification_types = st.sidebar.multiselect("Verification Types", verification_types)
-selected_years = st.sidebar.multiselect("Years", years)
+# Job Type Filter Buttons
+st.sidebar.subheader("Job Types")
+st.session_state.selected_job_types = create_filter_buttons(
+    job_types, "job_type", st.session_state.selected_job_types
+)
+
+# Verification Type Filter Buttons
+st.sidebar.subheader("Verification Types")
+st.session_state.selected_verification_types = create_filter_buttons(
+    verification_types, "verification_type", st.session_state.selected_verification_types
+)
+
+# Year Filter Buttons
+st.sidebar.subheader("Years")
+st.session_state.selected_years = create_filter_buttons(
+    years, "year", st.session_state.selected_years
+)
 
 # Search bar
 search_term = st.sidebar.text_input("Search by job name or creator")
@@ -78,19 +143,28 @@ search_term = st.sidebar.text_input("Search by job name or creator")
 tab1, tab2 = st.tabs(["Browse All Jobs", "Random Job Discovery"])
 
 with tab1:
-    st.subheader("Browse Jobs")
+    # Header with page controls
+    header_col1, header_col2 = st.columns([3, 1])
+    
+    with header_col1:
+        st.subheader("Browse Jobs")
+    
+    with header_col2:
+        # Apply filters button
+        if st.button("Apply Filters", use_container_width=True):
+            st.rerun()
     
     # Apply filters
     filtered_df = df.copy()
     
-    if selected_job_types:
-        filtered_df = filtered_df[filtered_df['job_type_edited'].isin(selected_job_types)]
+    if st.session_state.selected_job_types:
+        filtered_df = filtered_df[filtered_df['job_type_edited'].isin(st.session_state.selected_job_types)]
     
-    if selected_verification_types:
-        filtered_df = filtered_df[filtered_df['verification_type'].isin(selected_verification_types)]
+    if st.session_state.selected_verification_types:
+        filtered_df = filtered_df[filtered_df['verification_type'].isin(st.session_state.selected_verification_types)]
     
-    if selected_years:
-        filtered_df = filtered_df[filtered_df['creation_year'].isin(selected_years)]
+    if st.session_state.selected_years:
+        filtered_df = filtered_df[filtered_df['creation_year'].isin(st.session_state.selected_years)]
     
     if search_term:
         filtered_df = filtered_df[
@@ -102,10 +176,35 @@ with tab1:
     st.info(f"Found {len(filtered_df)} jobs matching your filters")
     
     if not filtered_df.empty:
-        # Pagination
-        page_size = 30  # Increased for condensed view
-        page = st.number_input("Page", min_value=1, max_value=(len(filtered_df) // page_size) + 1, value=1)
-        start_idx = (page - 1) * page_size
+        # Pagination controls in a single line
+        page_size = 30
+        total_pages = (len(filtered_df) // page_size) + 1
+        
+        # Create columns for pagination
+        page_col1, page_col2, page_col3 = st.columns([1, 2, 1])
+        
+        with page_col1:
+            if st.button("← Previous", disabled=st.session_state.get('current_page', 1) <= 1):
+                st.session_state.current_page = max(1, st.session_state.get('current_page', 1) - 1)
+                st.rerun()
+        
+        with page_col2:
+            current_page = st.number_input(
+                "Page", 
+                min_value=1, 
+                max_value=total_pages, 
+                value=st.session_state.get('current_page', 1),
+                key="page_input"
+            )
+            st.session_state.current_page = current_page
+        
+        with page_col3:
+            if st.button("Next →", disabled=st.session_state.get('current_page', 1) >= total_pages):
+                st.session_state.current_page = min(total_pages, st.session_state.get('current_page', 1) + 1)
+                st.rerun()
+        
+        # Get current page data
+        start_idx = (current_page - 1) * page_size
         end_idx = start_idx + page_size
         page_df = filtered_df.iloc[start_idx:end_idx]
         
@@ -121,7 +220,7 @@ with tab1:
                         # Use columns to control image size on different screens
                         img_col1, img_col2, img_col3 = st.columns([1, 6, 1])
                         with img_col2:
-                            st.image(row['job_image'], width=300, use_column_width=True)
+                            st.image(row['job_image'], width=300, use_container_width=True)
                 
                 with col2:
                     # Job name and creator on same line
@@ -189,7 +288,7 @@ with tab2:
                 with cols[i % 3]:
                     # Responsive image
                     if pd.notna(row['job_image']) and row['job_image']:
-                        st.image(row['job_image'], width=200, use_column_width=True)
+                        st.image(row['job_image'], width=200, use_container_width=True)
                     
                     # Job name and creator
                     st.markdown(f"**{row['job_name']}** by {row['job_creator']}")
