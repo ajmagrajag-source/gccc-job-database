@@ -4,29 +4,57 @@ import pandas as pd
 import random
 from datetime import datetime
 import time
+import toml
+import os
 
-# Set page configuration with custom color and logo
-st.set_page_config(
-    page_title="Rockstar Jobs Database",
-    page_icon="🎮",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+# Load configuration from config.toml
+def load_config():
+    config_path = os.path.join(os.path.dirname(__file__), "config.toml")
+    if os.path.exists(config_path):
+        return toml.load(config_path)
+    else:
+        # Default configuration if config.toml doesn't exist
+        return {
+            "app": {
+                "title": "Rockstar Social Club Jobs Database",
+                "description": "Browse and search through scraped Rockstar job data",
+                "logo": "assets/logo_gccc.png",
+                "logo_width": 80
+            },
+            "style": {
+                "primary_color": "#fcaf17",
+                "text_color": "black"
+            },
+            "assets": {
+                "rockstar_logo": "assets/logo_rockstar.png",
+                "gtalens_logo": "assets/logo_gtalens.png",
+                "logo_size": 30
+            }
+        }
 
-# Custom CSS for primary color and other styling
-st.markdown("""
+config = load_config()
+
+# Custom CSS with config values
+st.markdown(f"""
 <style>
-div.stButton > button:first-child {
-    background-color: #fcaf17;
-    color: black;
-}
-div.stButton > button:first-child:hover {
-    background-color: #e5a015;
-    color: black;
-}
-.streamlit-expanderHeader {
+div.stButton > button:first-child {{
+    background-color: {config['style']['primary_color']};
+    color: {config['style']['text_color']};
+}}
+div.stButton > button:first-child:hover {{
+    background-color: {config['style']['primary_color']};
+    opacity: 0.8;
+    color: {config['style']['text_color']};
+}}
+.streamlit-expanderHeader {{
     background-color: #f8f8f8;
-}
+}}
+.right-align {{
+    text-align: right;
+}}
+.center-align {{
+    text-align: center;
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -88,11 +116,11 @@ JOB_TYPE_ORDER = [
 # Main app with logo
 col1, col2 = st.columns([1, 10])
 with col1:
-    st.image("assets/logo_gccc.png", width=80)
+    st.image(config['app']['logo'], width=config['app']['logo_width'])
 with col2:
-    st.title("Rockstar Social Club Jobs Database")
+    st.title(config['app']['title'])
 
-st.markdown("Browse and search through scraped Rockstar job data")
+st.markdown(config['app']['description'])
 
 # Load data
 df = load_data()
@@ -117,8 +145,6 @@ if 'current_page' not in st.session_state:
     st.session_state.current_page = 1
 if 'filters_expanded' not in st.session_state:
     st.session_state.filters_expanded = True
-if 'view_mode' not in st.session_state:
-    st.session_state.view_mode = "card"  # "card" or "table"
 if 'sort_column' not in st.session_state:
     st.session_state.sort_column = "creation_date"
 if 'sort_direction' not in st.session_state:
@@ -224,18 +250,12 @@ tab1, tab2, tab3 = st.tabs(["Browse All Jobs", "Random Job Discovery", "Table Vi
 
 with tab1:
     # Header with page controls
-    header_col1, header_col2, header_col3 = st.columns([2, 1, 1])
+    header_col1, header_col2 = st.columns([3, 1])
     
     with header_col1:
         st.subheader("Browse Jobs")
     
     with header_col2:
-        # View mode toggle
-        if st.button("📊 Table View", use_container_width=True):
-            st.session_state.view_mode = "table"
-            st.rerun()
-    
-    with header_col3:
         # Clear filters button
         if st.button("Reset Page", use_container_width=True):
             st.session_state.current_page = 1
@@ -295,10 +315,33 @@ with tab1:
                 st.session_state.sort_direction = "asc" if sort_direction == "Ascending" else "desc"
                 st.rerun()
         
-        # Apply sorting
+        # Apply sorting with case-insensitive and date-aware sorting
         if st.session_state.sort_column in filtered_df.columns:
             ascending = st.session_state.sort_direction == "asc"
-            filtered_df = filtered_df.sort_values(by=st.session_state.sort_column, ascending=ascending)
+            
+            if st.session_state.sort_column in ["job_name", "job_creator"]:
+                # Case-insensitive sorting for text columns
+                filtered_df = filtered_df.sort_values(
+                    by=st.session_state.sort_column, 
+                    ascending=ascending, 
+                    key=lambda x: x.str.lower()
+                )
+            elif st.session_state.sort_column in ["creation_date", "last_updated"]:
+                # Date-aware sorting for date columns
+                filtered_df[st.session_state.sort_column] = pd.to_datetime(
+                    filtered_df[st.session_state.sort_column], 
+                    errors='coerce'
+                )
+                filtered_df = filtered_df.sort_values(
+                    by=st.session_state.sort_column, 
+                    ascending=ascending
+                )
+            else:
+                # Default sorting for other columns
+                filtered_df = filtered_df.sort_values(
+                    by=st.session_state.sort_column, 
+                    ascending=ascending
+                )
         
         # Pagination controls in a single line
         page_size = 30
@@ -371,10 +414,10 @@ with tab1:
                     # Links with icons
                     col_a, col_b = st.columns(2)
                     with col_a:
-                        st.markdown(f"[![Rockstar](assets/logo_rockstar.png)]({row['original_url']})")
+                        st.markdown(f"[![Rockstar]({config['assets']['rockstar_logo']}|width={config['assets']['logo_size']})]({row['original_url']})")
                     with col_b:
                         if pd.notna(row['gta_lens_link']) and row['gta_lens_link']:
-                            st.markdown(f"[![GTALens](assets/logo_gtalens.png)]({row['gta_lens_link']})")
+                            st.markdown(f"[![GTALens]({config['assets']['gtalens_logo']}|width={config['assets']['logo_size']})]({row['gta_lens_link']})")
                     
                     # Full description in expander (no character limit)
                     if pd.notna(row['job_description']) and row['job_description']:
@@ -424,7 +467,7 @@ with tab2:
                     else:
                         st.markdown(f"Type: {job_type}")
                     
-                    st.markdown(f"[![Rockstar](assets/logo_rockstar.png)]({row['original_url']})")
+                    st.markdown(f"[![Rockstar]({config['assets']['rockstar_logo']}|width={config['assets']['logo_size']})]({row['original_url']})")
                     st.divider()
         else:
             st.warning("No jobs found with the selected filters.")
@@ -488,30 +531,75 @@ with tab3:
                 st.session_state.sort_direction = "asc" if sort_direction == "Ascending" else "desc"
                 st.rerun()
         
-        # Apply sorting
+        # Apply sorting with case-insensitive and date-aware sorting
         if st.session_state.sort_column in filtered_df.columns:
             ascending = st.session_state.sort_direction == "asc"
-            filtered_df = filtered_df.sort_values(by=st.session_state.sort_column, ascending=ascending)
+            
+            if st.session_state.sort_column in ["job_name", "job_creator"]:
+                # Case-insensitive sorting for text columns
+                filtered_df = filtered_df.sort_values(
+                    by=st.session_state.sort_column, 
+                    ascending=ascending, 
+                    key=lambda x: x.str.lower()
+                )
+            elif st.session_state.sort_column in ["creation_date", "last_updated"]:
+                # Date-aware sorting for date columns
+                filtered_df[st.session_state.sort_column] = pd.to_datetime(
+                    filtered_df[st.session_state.sort_column], 
+                    errors='coerce'
+                )
+                filtered_df = filtered_df.sort_values(
+                    by=st.session_state.sort_column, 
+                    ascending=ascending
+                )
+            else:
+                # Default sorting for other columns
+                filtered_df = filtered_df.sort_values(
+                    by=st.session_state.sort_column, 
+                    ascending=ascending
+                )
         
         # Create a simplified dataframe for display
         display_df = filtered_df[[
             'job_name', 'job_creator', 'job_type_edited', 'max_players', 
-            'creation_date', 'last_updated', 'verification_type', 'original_url'
+            'creation_date', 'last_updated', 'verification_type', 'original_url', 'gta_lens_link'
         ]].copy()
         
         # Rename columns for better display
         display_df.columns = [
             'Job Name', 'Creator', 'Type', 'Max Players', 
-            'Created', 'Updated', 'Verification', 'URL'
+            'Created', 'Updated', 'Verification', 'Rockstar', 'Lens'
         ]
         
         # Convert URLs to clickable links
-        display_df['URL'] = display_df['URL'].apply(
-            lambda x: f'<a href="{x}" target="_blank">View</a>'
+        display_df['Job Name'] = display_df.apply(
+            lambda row: f"<a href='{row['Rockstar']}' target='_blank'>{row['Job Name']}</a>", 
+            axis=1
+        )
+        
+        display_df['Lens'] = display_df.apply(
+            lambda row: f"<a href='{row['Lens']}' target='_blank'>View</a>" if pd.notna(row['Lens']) else "", 
+            axis=1
+        )
+        
+        # Drop the original URL columns
+        display_df = display_df.drop(columns=['Rockstar'])
+        
+        # Create HTML table with custom styling
+        html_table = display_df.to_html(
+            escape=False,
+            index=False,
+            classes="dataframe",
+            formatters={
+                'Created': lambda x: f"<div class='right-align'>{x}</div>",
+                'Updated': lambda x: f"<div class='right-align'>{x}</div>",
+                'Max Players': lambda x: f"<div class='center-align'>{x}</div>",
+                'Lens': lambda x: f"<div class='center-align'>{x}</div>"
+            }
         )
         
         # Display the table
-        st.write(display_df.to_html(escape=False), unsafe_allow_html=True)
+        st.write(html_table, unsafe_allow_html=True)
     else:
         st.warning("No jobs match your filters. Try adjusting your search criteria.")
 

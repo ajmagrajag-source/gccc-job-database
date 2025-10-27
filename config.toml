@@ -1,0 +1,14 @@
+[app]
+title = "Rockstar Social Club Jobs Database"
+description = "Browse and search through scraped Rockstar job data"
+logo = "assets/logo_gccc.png"
+logo_width = 80
+
+[style]
+primary_color = "#fcaf17"
+text_color = "black"
+
+[assets]
+rockstar_logo = "assets/logo_rockstar.png"
+gtalens_logo = "assets/logo_gtalens.png"
+logo_size = 30
