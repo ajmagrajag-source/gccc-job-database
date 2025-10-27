@@ -4,7 +4,3 @@ description = "Browse and search through scraped Rockstar job data"
 logo = "assets/logo_gccc.png"
 logo_width = 80
 wide_view = true
-
-[theme]
-primaryColor = "#fcaf17"
-textColor = "black"

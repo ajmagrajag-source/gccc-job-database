@@ -21,10 +21,6 @@ def load_config():
                 "logo": "assets/logo_gccc.png",
                 "logo_width": 80,
                 "wide_view": True
-            },
-            "theme": {
-                "primaryColor": "#fcaf17",
-                "textColor": "black"
             }
         }
 
@@ -39,70 +35,30 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Asset definitions moved to Python code
+# Asset definitions
 ASSETS = {
     "rockstar_logo": "assets/logo_rockstar.png",
     "gtalens_logo": "assets/logo_gtalens.png",
     "logo_size": 30
 }
 
-# Custom CSS with config values
-st.markdown(f"""
+# Minimal CSS for layout only (no colors)
+st.markdown("""
 <style>
-/* Primary buttons (selected state) */
-div.stButton > button[kind="primary"] {{
-    background-color: {config['theme']['primaryColor']};
-    color: {config['theme']['textColor']};
-    border: 2px solid {config['theme']['primaryColor']};
-}}
-div.stButton > button[kind="primary"]:hover {{
-    background-color: {config['theme']['primaryColor']};
-    opacity: 0.8;
-    color: {config['theme']['textColor']};
-}}
-
-/* Secondary buttons (unselected state) */
-div.stButton > button[kind="secondary"] {{
-    background-color: white;
-    color: #333;
-    border: 1px solid #ccc;
-}}
-div.stButton > button[kind="secondary"]:hover {{
-    background-color: #f0f0f0;
-    border-color: #999;
-}}
-
-/* Slider styling */
-.stSlider > div > div > div > div {{
-    background-color: {config['theme']['primaryColor']};
-}}
-.stSlider > div > div > div > div > div {{
-    background-color: {config['theme']['primaryColor']};
-}}
-
-/* Tab styling */
-button[data-baseweb="tab"] {{
-    color: #666;
-}}
-button[data-baseweb="tab"][aria-selected="true"] {{
-    color: {config['theme']['primaryColor']};
-    border-bottom-color: {config['theme']['primaryColor']};
-}}
-
-.streamlit-expanderHeader {{
+.streamlit-expanderHeader {
     background-color: #f8f8f8;
-}}
-.right-align {{
+}
+.right-align {
     text-align: right;
-}}
-.center-align {{
+}
+.center-align {
     text-align: center;
-}}
-.job-type-container {{
+}
+.job-type-container {
     display: flex;
     justify-content: space-between;
     align-items: center;
-}}
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -236,9 +192,7 @@ with st.expander("Filters", expanded=st.session_state.filters_expanded):
     for i, job_type in enumerate(job_types):
         with job_type_cols[i % len(job_type_cols)]:
             is_selected = job_type in st.session_state.selected_job_types
-            # Only use primary color if selected
-            button_type = "primary" if is_selected else "secondary"
-            if st.button(job_type, key=f"job_type_{job_type}", use_container_width=True, type=button_type):
+            if st.button(job_type, key=f"job_type_{job_type}", use_container_width=True):
                 if is_selected:
                     st.session_state.selected_job_types.remove(job_type)
                 else:
@@ -253,9 +207,7 @@ with st.expander("Filters", expanded=st.session_state.filters_expanded):
     for i, verification_type in enumerate(verification_types):
         with verification_cols[i % len(verification_cols)]:
             is_selected = verification_type in st.session_state.selected_verification_types
-            # Only use primary color if selected
-            button_type = "primary" if is_selected else "secondary"
-            if st.button(verification_type, key=f"verification_{verification_type}", use_container_width=True, type=button_type):
+            if st.button(verification_type, key=f"verification_{verification_type}", use_container_width=True):
                 if is_selected:
                     st.session_state.selected_verification_types.remove(verification_type)
                 else:
@@ -300,9 +252,7 @@ with st.expander("Filters", expanded=st.session_state.filters_expanded):
     for i, player_option in enumerate(player_options):
         with player_cols[i]:
             is_selected = player_option in st.session_state.selected_player_filters
-            # Only use primary color if selected
-            button_type = "primary" if is_selected else "secondary"
-            if st.button(player_option, key=f"player_{player_option}", use_container_width=True, type=button_type):
+            if st.button(player_option, key=f"player_{player_option}", use_container_width=True):
                 if is_selected:
                     st.session_state.selected_player_filters.remove(player_option)
                 else:
