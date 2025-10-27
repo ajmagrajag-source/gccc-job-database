@@ -19,7 +19,8 @@ def load_config():
                 "title": "Rockstar Social Club Jobs Database",
                 "description": "Browse and search through scraped Rockstar job data",
                 "logo": "assets/logo_gccc.png",
-                "logo_width": 80
+                "logo_width": 80,
+                "wide_view": True
             },
             "style": {
                 "primary_color": "#fcaf17",
@@ -33,6 +34,15 @@ def load_config():
         }
 
 config = load_config()
+
+# Set page layout from config
+layout = "wide" if config["app"].get("wide_view", True) else "centered"
+st.set_page_config(
+    page_title="Rockstar Jobs Database",
+    page_icon="🎮",
+    layout=layout,
+    initial_sidebar_state="collapsed"
+)
 
 # Custom CSS with config values
 st.markdown(f"""
@@ -55,6 +65,11 @@ div.stButton > button:first-child:hover {{
 .center-align {{
     text-align: center;
 }}
+.job-type-container {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -70,6 +85,16 @@ def load_data():
     df = pd.read_sql_query("SELECT * FROM jobs ORDER BY creation_date DESC", conn)
     conn.close()
     return df
+
+def format_date(date_str):
+    """Format date string to a more user-friendly format"""
+    try:
+        date_obj = pd.to_datetime(date_str, errors='coerce')
+        if pd.notna(date_obj):
+            return date_obj.strftime("%B %d, %Y")
+        return date_str
+    except:
+        return date_str
 
 def get_random_jobs(df, n=12, job_type_filters=None, verification_filters=None, year_filters=None, player_filters=None):
     """Get n random jobs with optional filters"""
@@ -112,6 +137,17 @@ JOB_TYPE_ORDER = [
     "Other",
     "Parkour"
 ]
+
+# User-friendly column names for display
+COLUMN_DISPLAY_NAMES = {
+    "job_name": "Job Name",
+    "job_creator": "Creator",
+    "job_type_edited": "Job Type",
+    "max_players": "Max Players",
+    "creation_date": "Creation Date",
+    "last_updated": "Last Updated",
+    "verification_type": "Verification Type"
+}
 
 # Main app with logo
 col1, col2 = st.columns([1, 10])
@@ -167,7 +203,9 @@ with st.expander("Filters", expanded=st.session_state.filters_expanded):
     for i, job_type in enumerate(job_types):
         with job_type_cols[i % len(job_type_cols)]:
             is_selected = job_type in st.session_state.selected_job_types
-            if st.button(job_type, key=f"job_type_{job_type}", use_container_width=True, type="primary" if is_selected else "secondary"):
+            # Only use primary color if selected
+            button_type = "primary" if is_selected else "secondary"
+            if st.button(job_type, key=f"job_type_{job_type}", use_container_width=True, type=button_type):
                 if is_selected:
                     st.session_state.selected_job_types.remove(job_type)
                 else:
@@ -182,7 +220,9 @@ with st.expander("Filters", expanded=st.session_state.filters_expanded):
     for i, verification_type in enumerate(verification_types):
         with verification_cols[i % len(verification_cols)]:
             is_selected = verification_type in st.session_state.selected_verification_types
-            if st.button(verification_type, key=f"verification_{verification_type}", use_container_width=True, type="primary" if is_selected else "secondary"):
+            # Only use primary color if selected
+            button_type = "primary" if is_selected else "secondary"
+            if st.button(verification_type, key=f"verification_{verification_type}", use_container_width=True, type=button_type):
                 if is_selected:
                     st.session_state.selected_verification_types.remove(verification_type)
                 else:
@@ -227,7 +267,9 @@ with st.expander("Filters", expanded=st.session_state.filters_expanded):
     for i, player_option in enumerate(player_options):
         with player_cols[i]:
             is_selected = player_option in st.session_state.selected_player_filters
-            if st.button(player_option, key=f"player_{player_option}", use_container_width=True, type="primary" if is_selected else "secondary"):
+            # Only use primary color if selected
+            button_type = "primary" if is_selected else "secondary"
+            if st.button(player_option, key=f"player_{player_option}", use_container_width=True, type=button_type):
                 if is_selected:
                     st.session_state.selected_player_filters.remove(player_option)
                 else:
@@ -296,11 +338,13 @@ with tab1:
         # Sort controls
         sort_col1, sort_col2, sort_col3 = st.columns([1, 1, 1])
         with sort_col1:
-            sort_column = st.selectbox(
-                "Sort by",
-                ["job_name", "job_creator", "job_type_edited", "creation_date", "last_updated", "verification_type"],
-                index=["job_name", "job_creator", "job_type_edited", "creation_date", "last_updated", "verification_type"].index(st.session_state.sort_column) if st.session_state.sort_column in ["job_name", "job_creator", "job_type_edited", "creation_date", "last_updated", "verification_type"] else 0
-            )
+            # Use display names for sort options
+            sort_options = [COLUMN_DISPLAY_NAMES.get(col, col) for col in ["job_name", "job_creator", "job_type_edited", "creation_date", "last_updated", "verification_type"]]
+            current_index = sort_options.index(COLUMN_DISPLAY_NAMES.get(st.session_state.sort_column, st.session_state.sort_column)) if st.session_state.sort_column in COLUMN_DISPLAY_NAMES else 0
+            sort_column_display = st.selectbox("Sort by", sort_options, index=current_index)
+            
+            # Convert display name back to column name
+            sort_column = {v: k for k, v in COLUMN_DISPLAY_NAMES.items()}.get(sort_column_display, sort_column_display)
         
         with sort_col2:
             sort_direction = st.selectbox(
@@ -406,8 +450,8 @@ with tab1:
                         st.markdown(f"<p style='font-style: italic; text-align: right;'>{job_type}</p>", unsafe_allow_html=True)
                     
                     # Creation date, update date, and verification type
-                    creation_date = row['creation_date']
-                    last_updated = row['last_updated']
+                    creation_date = format_date(row['creation_date'])
+                    last_updated = format_date(row['last_updated'])
                     verification = row['verification_type']
                     st.markdown(f"**Created:** {creation_date} | **Updated:** {last_updated} | **{verification}**")
                     
@@ -510,12 +554,13 @@ with tab3:
         # Sort controls
         sort_col1, sort_col2, sort_col3 = st.columns([1, 1, 1])
         with sort_col1:
-            sort_column = st.selectbox(
-                "Sort by",
-                ["job_name", "job_creator", "job_type_edited", "creation_date", "last_updated", "verification_type"],
-                index=["job_name", "job_creator", "job_type_edited", "creation_date", "last_updated", "verification_type"].index(st.session_state.sort_column) if st.session_state.sort_column in ["job_name", "job_creator", "job_type_edited", "creation_date", "last_updated", "verification_type"] else 0,
-                key="table_sort_column"
-            )
+            # Use display names for sort options
+            sort_options = [COLUMN_DISPLAY_NAMES.get(col, col) for col in ["job_name", "job_creator", "job_type_edited", "creation_date", "last_updated", "verification_type"]]
+            current_index = sort_options.index(COLUMN_DISPLAY_NAMES.get(st.session_state.sort_column, st.session_state.sort_column)) if st.session_state.sort_column in COLUMN_DISPLAY_NAMES else 0
+            sort_column_display = st.selectbox("Sort by", sort_options, index=current_index, key="table_sort_column")
+            
+            # Convert display name back to column name
+            sort_column = {v: k for k, v in COLUMN_DISPLAY_NAMES.items()}.get(sort_column_display, sort_column_display)
         
         with sort_col2:
             sort_direction = st.selectbox(
@@ -564,6 +609,10 @@ with tab3:
             'job_name', 'job_creator', 'job_type_edited', 'max_players', 
             'creation_date', 'last_updated', 'verification_type', 'original_url', 'gta_lens_link'
         ]].copy()
+        
+        # Format dates for display
+        display_df['creation_date'] = display_df['creation_date'].apply(format_date)
+        display_df['last_updated'] = display_df['last_updated'].apply(format_date)
         
         # Rename columns for better display
         display_df.columns = [
