@@ -24,7 +24,7 @@ def load_data():
     conn.close()
     return df
 
-def get_random_jobs(df, n=12, job_type_filters=None, verification_filters=None, year_filters=None):
+def get_random_jobs(df, n=12, job_type_filters=None, verification_filters=None, year_filters=None, player_filters=None):
     """Get n random jobs with optional filters"""
     filtered_df = df.copy()
     
@@ -36,6 +36,14 @@ def get_random_jobs(df, n=12, job_type_filters=None, verification_filters=None, 
     
     if year_filters and len(year_filters) > 0:
         filtered_df = filtered_df[filtered_df['creation_year'].isin(year_filters)]
+    
+    if player_filters and len(player_filters) > 0:
+        if "30 players" in player_filters:
+            filtered_df = filtered_df[filtered_df['max_players'] == "30"]
+        elif "16-29 players" in player_filters:
+            filtered_df = filtered_df[filtered_df['max_players'].astype(int).between(16, 29)]
+        elif "8-15 players" in player_filters:
+            filtered_df = filtered_df[filtered_df['max_players'].astype(int).between(8, 15)]
     
     if len(filtered_df) == 0:
         return pd.DataFrame()
@@ -77,66 +85,93 @@ if 'selected_job_types' not in st.session_state:
     st.session_state.selected_job_types = []
 if 'selected_verification_types' not in st.session_state:
     st.session_state.selected_verification_types = []
-if 'selected_years' not in st.session_state:
-    st.session_state.selected_years = []
+if 'selected_year_range' not in st.session_state:
+    st.session_state.selected_year_range = [int(min(df['creation_year'])), int(max(df['creation_year']))]
+if 'selected_player_filters' not in st.session_state:
+    st.session_state.selected_player_filters = []
 if 'current_page' not in st.session_state:
     st.session_state.current_page = 1
+if 'filters_expanded' not in st.session_state:
+    st.session_state.filters_expanded = True
 
 # Get unique values for filters
 job_types = [x for x in JOB_TYPE_ORDER if x in df['job_type_edited'].unique()]
 verification_types = sorted([x for x in df['verification_type'].unique() if pd.notna(x)])
-years = sorted([str(x) for x in df['creation_year'].unique() if pd.notna(x)], reverse=True)
-
-# Create filter section
-st.markdown("## Filters")
+min_year = int(min(df['creation_year']))
+max_year = int(max(df['creation_year']))
 
 # Search bar
-search_term = st.text_input("Search by job name or creator")
+search_term = st.text_input("Search by Job Name or Creator")
 
-# Job Type Filter
-st.markdown("### Job Type")
-job_type_cols = st.columns(min(5, len(job_types)))
-for i, job_type in enumerate(job_types):
-    with job_type_cols[i % len(job_type_cols)]:
-        is_selected = job_type in st.session_state.selected_job_types
-        if st.button(job_type, key=f"job_type_{job_type}", use_container_width=True, type="primary" if is_selected else "secondary"):
-            if is_selected:
-                st.session_state.selected_job_types.remove(job_type)
-            else:
-                st.session_state.selected_job_types.append(job_type)
-            st.rerun()
-
-st.markdown("---")
-
-# Verification Type Filter
-st.markdown("### Verification Types")
-verification_cols = st.columns(min(3, len(verification_types)))
-for i, verification_type in enumerate(verification_types):
-    with verification_cols[i % len(verification_cols)]:
-        is_selected = verification_type in st.session_state.selected_verification_types
-        if st.button(verification_type, key=f"verification_{verification_type}", use_container_width=True, type="primary" if is_selected else "secondary"):
-            if is_selected:
-                st.session_state.selected_verification_types.remove(verification_type)
-            else:
-                st.session_state.selected_verification_types.append(verification_type)
-            st.rerun()
-
-st.markdown("---")
-
-# Year Filter
-st.markdown("### Years")
-year_cols = st.columns(min(5, len(years)))
-for i, year in enumerate(years):
-    with year_cols[i % len(year_cols)]:
-        is_selected = year in st.session_state.selected_years
-        if st.button(year, key=f"year_{year}", use_container_width=True, type="primary" if is_selected else "secondary"):
-            if is_selected:
-                st.session_state.selected_years.remove(year)
-            else:
-                st.session_state.selected_years.append(year)
-            st.rerun()
-
-st.markdown("---")
+# Create collapsible filter section
+with st.expander("Filters", expanded=st.session_state.filters_expanded):
+    # Job Type Filter
+    st.markdown("### Job Type")
+    job_type_cols = st.columns(min(5, len(job_types)))
+    for i, job_type in enumerate(job_types):
+        with job_type_cols[i % len(job_type_cols)]:
+            is_selected = job_type in st.session_state.selected_job_types
+            if st.button(job_type, key=f"job_type_{job_type}", use_container_width=True, type="primary" if is_selected else "secondary"):
+                if is_selected:
+                    st.session_state.selected_job_types.remove(job_type)
+                else:
+                    st.session_state.selected_job_types.append(job_type)
+                st.rerun()
+    
+    st.markdown("---")
+    
+    # Verification Type Filter
+    st.markdown("### Verification Types")
+    verification_cols = st.columns(min(3, len(verification_types)))
+    for i, verification_type in enumerate(verification_types):
+        with verification_cols[i % len(verification_cols)]:
+            is_selected = verification_type in st.session_state.selected_verification_types
+            if st.button(verification_type, key=f"verification_{verification_type}", use_container_width=True, type="primary" if is_selected else "secondary"):
+                if is_selected:
+                    st.session_state.selected_verification_types.remove(verification_type)
+                else:
+                    st.session_state.selected_verification_types.append(verification_type)
+                st.rerun()
+    
+    st.markdown("---")
+    
+    # Creation Year Filter (Slider)
+    st.markdown("### Creation Year")
+    year_range = st.slider(
+        "Select Year Range",
+        min_value=min_year,
+        max_value=max_year,
+        value=st.session_state.selected_year_range,
+        step=1
+    )
+    st.session_state.selected_year_range = year_range
+    
+    st.markdown("---")
+    
+    # Max Players Filter
+    st.markdown("### Max Players")
+    player_options = ["30 players", "16-29 players", "8-15 players"]
+    player_cols = st.columns(len(player_options))
+    for i, player_option in enumerate(player_options):
+        with player_cols[i]:
+            is_selected = player_option in st.session_state.selected_player_filters
+            if st.button(player_option, key=f"player_{player_option}", use_container_width=True, type="primary" if is_selected else "secondary"):
+                if is_selected:
+                    st.session_state.selected_player_filters.remove(player_option)
+                else:
+                    st.session_state.selected_player_filters = [player_option]  # Only allow one selection
+                st.rerun()
+    
+    st.markdown("---")
+    
+    # Clear filters button
+    if st.button("Clear All Filters", use_container_width=True):
+        st.session_state.selected_job_types = []
+        st.session_state.selected_verification_types = []
+        st.session_state.selected_year_range = [min_year, max_year]
+        st.session_state.selected_player_filters = []
+        st.session_state.current_page = 1
+        st.rerun()
 
 # Main content area
 tab1, tab2 = st.tabs(["Browse All Jobs", "Random Job Discovery"])
@@ -150,10 +185,7 @@ with tab1:
     
     with header_col2:
         # Clear filters button
-        if st.button("Clear Filters", use_container_width=True):
-            st.session_state.selected_job_types = []
-            st.session_state.selected_verification_types = []
-            st.session_state.selected_years = []
+        if st.button("Reset Page", use_container_width=True):
             st.session_state.current_page = 1
             st.rerun()
     
@@ -166,8 +198,18 @@ with tab1:
     if st.session_state.selected_verification_types:
         filtered_df = filtered_df[filtered_df['verification_type'].isin(st.session_state.selected_verification_types)]
     
-    if st.session_state.selected_years:
-        filtered_df = filtered_df[filtered_df['creation_year'].isin(st.session_state.selected_years)]
+    # Apply year range filter
+    year_min, year_max = st.session_state.selected_year_range
+    filtered_df = filtered_df[filtered_df['creation_year'].astype(int).between(year_min, year_max)]
+    
+    # Apply player count filter
+    if st.session_state.selected_player_filters:
+        if "30 players" in st.session_state.selected_player_filters:
+            filtered_df = filtered_df[filtered_df['max_players'] == "30"]
+        elif "16-29 players" in st.session_state.selected_player_filters:
+            filtered_df = filtered_df[filtered_df['max_players'].astype(int).between(16, 29)]
+        elif "8-15 players" in st.session_state.selected_player_filters:
+            filtered_df = filtered_df[filtered_df['max_players'].astype(int).between(8, 15)]
     
     if search_term:
         filtered_df = filtered_df[
@@ -229,33 +271,31 @@ with tab1:
                             st.image(row['job_image'], width=300, use_container_width=True)
                 
                 with col2:
-                    # Job name and creator on same line
+                    # Job name and creator with job type on same line
                     job_name = row['job_name']
                     job_creator = row['job_creator']
-                    st.markdown(f"### {job_name} by {job_creator}")
-                    
-                    # Job type and player count on same line
                     job_type = row['job_type_edited'] or row['job_type']
-                    max_players = row['max_players']
                     
-                    # Only show player count if it's not 30
-                    if max_players and max_players != "30":
-                        st.markdown(f"**{job_type}** | **{max_players} players**")
-                    else:
-                        st.markdown(f"**{job_type}**")
+                    # Create columns for job info
+                    info_col1, info_col2 = st.columns([3, 1])
+                    with info_col1:
+                        st.markdown(f"### {job_name} by {job_creator}")
+                    with info_col2:
+                        st.markdown(f"<p style='font-style: italic; text-align: right;'>{job_type}</p>", unsafe_allow_html=True)
                     
-                    # Verification type and creation date
-                    verification = row['verification_type']
+                    # Creation date, update date, and verification type
                     creation_date = row['creation_date']
-                    st.markdown(f"**Verification:** {verification} | **Created:** {creation_date}")
+                    last_updated = row['last_updated']
+                    verification = row['verification_type']
+                    st.markdown(f"**Created:** {creation_date} | **Updated:** {last_updated} | **{verification}**")
                     
-                    # Links
+                    # Links with icons
                     col_a, col_b = st.columns(2)
                     with col_a:
-                        st.markdown(f"[🔗 View on Rockstar]({row['original_url']})")
+                        st.markdown(f"[🎮 View on Rockstar]({row['original_url']})")
                     with col_b:
                         if pd.notna(row['gta_lens_link']) and row['gta_lens_link']:
-                            st.markdown(f"[🔗 View on GTALens]({row['gta_lens_link']})")
+                            st.markdown(f"[🔍 View on GTALens]({row['gta_lens_link']})")
                     
                     # Full description in expander (no character limit)
                     if pd.notna(row['job_description']) and row['job_description']:
@@ -278,7 +318,8 @@ with tab2:
             num_jobs, 
             st.session_state.selected_job_types,
             st.session_state.selected_verification_types,
-            st.session_state.selected_years
+            [str(year) for year in range(st.session_state.selected_year_range[0], st.session_state.selected_year_range[1] + 1)],
+            st.session_state.selected_player_filters
         )
         
         if not random_jobs.empty:
@@ -304,7 +345,7 @@ with tab2:
                     else:
                         st.markdown(f"Type: {job_type}")
                     
-                    st.markdown(f"[View Job]({row['original_url']})")
+                    st.markdown(f"[🎮 View Job]({row['original_url']})")
                     st.divider()
         else:
             st.warning("No jobs found with the selected filters.")
