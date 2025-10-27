@@ -22,14 +22,9 @@ def load_config():
                 "logo_width": 80,
                 "wide_view": True
             },
-            "style": {
-                "primary_color": "#fcaf17",
-                "text_color": "black"
-            },
-            "assets": {
-                "rockstar_logo": "assets/logo_rockstar.png",
-                "gtalens_logo": "assets/logo_gtalens.png",
-                "logo_size": 30
+            "theme": {
+                "primaryColor": "#fcaf17",
+                "textColor": "black"
             }
         }
 
@@ -44,17 +39,24 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Asset definitions moved to Python code
+ASSETS = {
+    "rockstar_logo": "assets/logo_rockstar.png",
+    "gtalens_logo": "assets/logo_gtalens.png",
+    "logo_size": 30
+}
+
 # Custom CSS with config values
 st.markdown(f"""
 <style>
 div.stButton > button:first-child {{
-    background-color: {config['style']['primary_color']};
-    color: {config['style']['text_color']};
+    background-color: {config['theme']['primaryColor']};
+    color: {config['theme']['textColor']};
 }}
 div.stButton > button:first-child:hover {{
-    background-color: {config['style']['primary_color']};
+    background-color: {config['theme']['primaryColor']};
     opacity: 0.8;
-    color: {config['style']['text_color']};
+    color: {config['theme']['textColor']};
 }}
 .streamlit-expanderHeader {{
     background-color: #f8f8f8;
@@ -287,8 +289,8 @@ with st.expander("Filters", expanded=st.session_state.filters_expanded):
         st.session_state.current_page = 1
         st.rerun()
 
-# Main content area
-tab1, tab2, tab3 = st.tabs(["Browse All Jobs", "Random Job Discovery", "Table View"])
+# Main content area - Reorganized tabs
+tab1, tab2, tab3 = st.tabs(["Browse All Jobs", "Table View", "Random Job Discovery"])
 
 with tab1:
     # Header with page controls
@@ -387,7 +389,7 @@ with tab1:
                     ascending=ascending
                 )
         
-        # Pagination controls in a single line
+        # Pagination controls (removed Next/Previous buttons)
         page_size = 30
         total_pages = (len(filtered_df) // page_size) + 1
         
@@ -395,13 +397,11 @@ with tab1:
         page_col1, page_col2, page_col3 = st.columns([1, 2, 1])
         
         with page_col1:
-            if st.button("← Previous", disabled=st.session_state.current_page <= 1):
-                st.session_state.current_page = max(1, st.session_state.current_page - 1)
-                st.rerun()
+            st.write(f"Page {st.session_state.current_page} of {total_pages}")
         
         with page_col2:
             current_page = st.number_input(
-                "Page", 
+                "Go to page", 
                 min_value=1, 
                 max_value=total_pages, 
                 value=st.session_state.current_page,
@@ -413,9 +413,7 @@ with tab1:
                 st.rerun()
         
         with page_col3:
-            if st.button("Next →", disabled=st.session_state.current_page >= total_pages):
-                st.session_state.current_page = min(total_pages, st.session_state.current_page + 1)
-                st.rerun()
+            st.write(f"Showing {min(page_size, len(filtered_df) - (current_page-1)*page_size)} of {len(filtered_df)} jobs")
         
         # Get current page data
         start_idx = (current_page - 1) * page_size
@@ -458,10 +456,10 @@ with tab1:
                     # Links with icons
                     col_a, col_b = st.columns(2)
                     with col_a:
-                        st.markdown(f"[![Rockstar]({config['assets']['rockstar_logo']}|width={config['assets']['logo_size']})]({row['original_url']})")
+                        st.markdown(f"[![Rockstar]({ASSETS['rockstar_logo']}|width={ASSETS['logo_size']})]({row['original_url']})")
                     with col_b:
                         if pd.notna(row['gta_lens_link']) and row['gta_lens_link']:
-                            st.markdown(f"[![GTALens]({config['assets']['gtalens_logo']}|width={config['assets']['logo_size']})]({row['gta_lens_link']})")
+                            st.markdown(f"[![GTALens]({ASSETS['gtalens_logo']}|width={ASSETS['logo_size']})]({row['gta_lens_link']})")
                     
                     # Full description in expander (no character limit)
                     if pd.notna(row['job_description']) and row['job_description']:
@@ -473,50 +471,6 @@ with tab1:
         st.warning("No jobs match your filters. Try adjusting your search criteria.")
 
 with tab2:
-    st.subheader("Random Job Discovery")
-    
-    # Use the same filters as the main page
-    num_jobs = st.slider("Number of random jobs to show", min_value=1, max_value=30, value=12)
-    
-    if st.button("🎲 Get Random Jobs"):
-        random_jobs = get_random_jobs(
-            df, 
-            num_jobs, 
-            st.session_state.selected_job_types,
-            st.session_state.selected_verification_types,
-            [str(year) for year in range(st.session_state.selected_year_range[0], st.session_state.selected_year_range[1] + 1)],
-            st.session_state.selected_player_filters
-        )
-        
-        if not random_jobs.empty:
-            st.success(f"Found {len(random_jobs)} random jobs!")
-            
-            # Display in a grid
-            cols = st.columns(3)
-            for i, (_, row) in enumerate(random_jobs.iterrows()):
-                with cols[i % 3]:
-                    # Responsive image
-                    if pd.notna(row['job_image']) and row['job_image']:
-                        st.image(row['job_image'], width=200, use_container_width=True)
-                    
-                    # Job name and creator
-                    st.markdown(f"**{row['job_name']}** by {row['job_creator']}")
-                    
-                    # Job type and player count
-                    job_type = row['job_type_edited'] or row['job_type']
-                    max_players = row['max_players']
-                    
-                    if max_players and max_players != "30":
-                        st.markdown(f"Type: {job_type} | {max_players} players")
-                    else:
-                        st.markdown(f"Type: {job_type}")
-                    
-                    st.markdown(f"[![Rockstar]({config['assets']['rockstar_logo']}|width={config['assets']['logo_size']})]({row['original_url']})")
-                    st.divider()
-        else:
-            st.warning("No jobs found with the selected filters.")
-
-with tab3:
     st.subheader("Table View")
     
     # Apply the same filters as in the card view
@@ -651,6 +605,50 @@ with tab3:
         st.write(html_table, unsafe_allow_html=True)
     else:
         st.warning("No jobs match your filters. Try adjusting your search criteria.")
+
+with tab3:
+    st.subheader("Random Job Discovery")
+    
+    # Use the same filters as the main page
+    num_jobs = st.slider("Number of random jobs to show", min_value=1, max_value=30, value=12)
+    
+    if st.button("🎲 Get Random Jobs"):
+        random_jobs = get_random_jobs(
+            df, 
+            num_jobs, 
+            st.session_state.selected_job_types,
+            st.session_state.selected_verification_types,
+            [str(year) for year in range(st.session_state.selected_year_range[0], st.session_state.selected_year_range[1] + 1)],
+            st.session_state.selected_player_filters
+        )
+        
+        if not random_jobs.empty:
+            st.success(f"Found {len(random_jobs)} random jobs!")
+            
+            # Display in a grid
+            cols = st.columns(3)
+            for i, (_, row) in enumerate(random_jobs.iterrows()):
+                with cols[i % 3]:
+                    # Responsive image
+                    if pd.notna(row['job_image']) and row['job_image']:
+                        st.image(row['job_image'], width=200, use_container_width=True)
+                    
+                    # Job name and creator
+                    st.markdown(f"**{row['job_name']}** by {row['job_creator']}")
+                    
+                    # Job type and player count
+                    job_type = row['job_type_edited'] or row['job_type']
+                    max_players = row['max_players']
+                    
+                    if max_players and max_players != "30":
+                        st.markdown(f"Type: {job_type} | {max_players} players")
+                    else:
+                        st.markdown(f"Type: {job_type}")
+                    
+                    st.markdown(f"[![Rockstar]({ASSETS['rockstar_logo']}|width={ASSETS['logo_size']})]({row['original_url']})")
+                    st.divider()
+        else:
+            st.warning("No jobs found with the selected filters.")
 
 # Footer
 st.markdown("---")
