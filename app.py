@@ -49,15 +49,46 @@ ASSETS = {
 # Custom CSS with config values
 st.markdown(f"""
 <style>
-div.stButton > button:first-child {{
+/* Primary buttons (selected state) */
+div.stButton > button[kind="primary"] {{
     background-color: {config['theme']['primaryColor']};
     color: {config['theme']['textColor']};
+    border: 2px solid {config['theme']['primaryColor']};
 }}
-div.stButton > button:first-child:hover {{
+div.stButton > button[kind="primary"]:hover {{
     background-color: {config['theme']['primaryColor']};
     opacity: 0.8;
     color: {config['theme']['textColor']};
 }}
+
+/* Secondary buttons (unselected state) */
+div.stButton > button[kind="secondary"] {{
+    background-color: white;
+    color: #333;
+    border: 1px solid #ccc;
+}}
+div.stButton > button[kind="secondary"]:hover {{
+    background-color: #f0f0f0;
+    border-color: #999;
+}}
+
+/* Slider styling */
+.stSlider > div > div > div > div {{
+    background-color: {config['theme']['primaryColor']};
+}}
+.stSlider > div > div > div > div > div {{
+    background-color: {config['theme']['primaryColor']};
+}}
+
+/* Tab styling */
+button[data-baseweb="tab"] {{
+    color: #666;
+}}
+button[data-baseweb="tab"][aria-selected="true"] {{
+    color: {config['theme']['primaryColor']};
+    border-bottom-color: {config['theme']['primaryColor']};
+}}
+
 .streamlit-expanderHeader {{
     background-color: #f8f8f8;
 }}
