@@ -3,13 +3,32 @@ import sqlite3
 import pandas as pd
 import random
 from datetime import datetime
+import time
 
-# Set page configuration
+# Set page configuration with custom color and logo
 st.set_page_config(
     page_title="Rockstar Jobs Database",
     page_icon="🎮",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
+
+# Custom CSS for primary color and other styling
+st.markdown("""
+<style>
+div.stButton > button:first-child {
+    background-color: #fcaf17;
+    color: black;
+}
+div.stButton > button:first-child:hover {
+    background-color: #e5a015;
+    color: black;
+}
+.streamlit-expanderHeader {
+    background-color: #f8f8f8;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # Database connection
 @st.cache_resource
@@ -66,8 +85,13 @@ JOB_TYPE_ORDER = [
     "Parkour"
 ]
 
-# Main app
-st.title("🎮 Rockstar Social Club Jobs Database")
+# Main app with logo
+col1, col2 = st.columns([1, 10])
+with col1:
+    st.image("assets/logo_gccc.png", width=80)
+with col2:
+    st.title("Rockstar Social Club Jobs Database")
+
 st.markdown("Browse and search through scraped Rockstar job data")
 
 # Load data
@@ -93,6 +117,12 @@ if 'current_page' not in st.session_state:
     st.session_state.current_page = 1
 if 'filters_expanded' not in st.session_state:
     st.session_state.filters_expanded = True
+if 'view_mode' not in st.session_state:
+    st.session_state.view_mode = "card"  # "card" or "table"
+if 'sort_column' not in st.session_state:
+    st.session_state.sort_column = "creation_date"
+if 'sort_direction' not in st.session_state:
+    st.session_state.sort_direction = "desc"
 
 # Get unique values for filters
 job_types = [x for x in JOB_TYPE_ORDER if x in df['job_type_edited'].unique()]
@@ -135,16 +165,32 @@ with st.expander("Filters", expanded=st.session_state.filters_expanded):
     
     st.markdown("---")
     
-    # Creation Year Filter (Slider)
+    # Creation Year Filter (Slider with debounce)
     st.markdown("### Creation Year")
-    year_range = st.slider(
-        "Select Year Range",
-        min_value=min_year,
-        max_value=max_year,
-        value=st.session_state.selected_year_range,
-        step=1
-    )
-    st.session_state.selected_year_range = year_range
+    
+    # Get current slider value
+    current_year_range = st.session_state.selected_year_range
+    
+    # Create a placeholder for the slider
+    year_slider_placeholder = st.empty()
+    
+    # Create the slider in the placeholder
+    with year_slider_placeholder:
+        year_range = st.slider(
+            "Select Year Range",
+            min_value=min_year,
+            max_value=max_year,
+            value=current_year_range,
+            step=1,
+            key="year_slider"
+        )
+    
+    # Only update session state if the slider value has changed
+    if year_range != current_year_range:
+        st.session_state.selected_year_range = year_range
+        # Add a small delay to prevent excessive reruns
+        time.sleep(0.1)
+        st.rerun()
     
     st.markdown("---")
     
@@ -174,16 +220,22 @@ with st.expander("Filters", expanded=st.session_state.filters_expanded):
         st.rerun()
 
 # Main content area
-tab1, tab2 = st.tabs(["Browse All Jobs", "Random Job Discovery"])
+tab1, tab2, tab3 = st.tabs(["Browse All Jobs", "Random Job Discovery", "Table View"])
 
 with tab1:
     # Header with page controls
-    header_col1, header_col2 = st.columns([3, 1])
+    header_col1, header_col2, header_col3 = st.columns([2, 1, 1])
     
     with header_col1:
         st.subheader("Browse Jobs")
     
     with header_col2:
+        # View mode toggle
+        if st.button("📊 Table View", use_container_width=True):
+            st.session_state.view_mode = "table"
+            st.rerun()
+    
+    with header_col3:
         # Clear filters button
         if st.button("Reset Page", use_container_width=True):
             st.session_state.current_page = 1
@@ -221,6 +273,33 @@ with tab1:
     st.info(f"Found {len(filtered_df)} jobs matching your filters")
     
     if not filtered_df.empty:
+        # Sort controls
+        sort_col1, sort_col2, sort_col3 = st.columns([1, 1, 1])
+        with sort_col1:
+            sort_column = st.selectbox(
+                "Sort by",
+                ["job_name", "job_creator", "job_type_edited", "creation_date", "last_updated", "verification_type"],
+                index=["job_name", "job_creator", "job_type_edited", "creation_date", "last_updated", "verification_type"].index(st.session_state.sort_column) if st.session_state.sort_column in ["job_name", "job_creator", "job_type_edited", "creation_date", "last_updated", "verification_type"] else 0
+            )
+        
+        with sort_col2:
+            sort_direction = st.selectbox(
+                "Direction",
+                ["Ascending", "Descending"],
+                index=0 if st.session_state.sort_direction == "asc" else 1
+            )
+        
+        with sort_col3:
+            if st.button("Apply Sort", use_container_width=True):
+                st.session_state.sort_column = sort_column
+                st.session_state.sort_direction = "asc" if sort_direction == "Ascending" else "desc"
+                st.rerun()
+        
+        # Apply sorting
+        if st.session_state.sort_column in filtered_df.columns:
+            ascending = st.session_state.sort_direction == "asc"
+            filtered_df = filtered_df.sort_values(by=st.session_state.sort_column, ascending=ascending)
+        
         # Pagination controls in a single line
         page_size = 30
         total_pages = (len(filtered_df) // page_size) + 1
@@ -292,10 +371,10 @@ with tab1:
                     # Links with icons
                     col_a, col_b = st.columns(2)
                     with col_a:
-                        st.markdown(f"[🎮 View on Rockstar]({row['original_url']})")
+                        st.markdown(f"[![Rockstar](assets/logo_rockstar.png)]({row['original_url']})")
                     with col_b:
                         if pd.notna(row['gta_lens_link']) and row['gta_lens_link']:
-                            st.markdown(f"[🔍 View on GTALens]({row['gta_lens_link']})")
+                            st.markdown(f"[![GTALens](assets/logo_gtalens.png)]({row['gta_lens_link']})")
                     
                     # Full description in expander (no character limit)
                     if pd.notna(row['job_description']) and row['job_description']:
@@ -345,10 +424,96 @@ with tab2:
                     else:
                         st.markdown(f"Type: {job_type}")
                     
-                    st.markdown(f"[🎮 View Job]({row['original_url']})")
+                    st.markdown(f"[![Rockstar](assets/logo_rockstar.png)]({row['original_url']})")
                     st.divider()
         else:
             st.warning("No jobs found with the selected filters.")
+
+with tab3:
+    st.subheader("Table View")
+    
+    # Apply the same filters as in the card view
+    filtered_df = df.copy()
+    
+    if st.session_state.selected_job_types:
+        filtered_df = filtered_df[filtered_df['job_type_edited'].isin(st.session_state.selected_job_types)]
+    
+    if st.session_state.selected_verification_types:
+        filtered_df = filtered_df[filtered_df['verification_type'].isin(st.session_state.selected_verification_types)]
+    
+    # Apply year range filter
+    year_min, year_max = st.session_state.selected_year_range
+    filtered_df = filtered_df[filtered_df['creation_year'].astype(int).between(year_min, year_max)]
+    
+    # Apply player count filter
+    if st.session_state.selected_player_filters:
+        if "30 players" in st.session_state.selected_player_filters:
+            filtered_df = filtered_df[filtered_df['max_players'] == "30"]
+        elif "16-29 players" in st.session_state.selected_player_filters:
+            filtered_df = filtered_df[filtered_df['max_players'].astype(int).between(16, 29)]
+        elif "8-15 players" in st.session_state.selected_player_filters:
+            filtered_df = filtered_df[filtered_df['max_players'].astype(int).between(8, 15)]
+    
+    if search_term:
+        filtered_df = filtered_df[
+            filtered_df['job_name'].str.contains(search_term, case=False) |
+            filtered_df['job_creator'].str.contains(search_term, case=False)
+        ]
+    
+    # Display results
+    st.info(f"Found {len(filtered_df)} jobs matching your filters")
+    
+    if not filtered_df.empty:
+        # Sort controls
+        sort_col1, sort_col2, sort_col3 = st.columns([1, 1, 1])
+        with sort_col1:
+            sort_column = st.selectbox(
+                "Sort by",
+                ["job_name", "job_creator", "job_type_edited", "creation_date", "last_updated", "verification_type"],
+                index=["job_name", "job_creator", "job_type_edited", "creation_date", "last_updated", "verification_type"].index(st.session_state.sort_column) if st.session_state.sort_column in ["job_name", "job_creator", "job_type_edited", "creation_date", "last_updated", "verification_type"] else 0,
+                key="table_sort_column"
+            )
+        
+        with sort_col2:
+            sort_direction = st.selectbox(
+                "Direction",
+                ["Ascending", "Descending"],
+                index=0 if st.session_state.sort_direction == "asc" else 1,
+                key="table_sort_direction"
+            )
+        
+        with sort_col3:
+            if st.button("Apply Sort", use_container_width=True, key="table_apply_sort"):
+                st.session_state.sort_column = sort_column
+                st.session_state.sort_direction = "asc" if sort_direction == "Ascending" else "desc"
+                st.rerun()
+        
+        # Apply sorting
+        if st.session_state.sort_column in filtered_df.columns:
+            ascending = st.session_state.sort_direction == "asc"
+            filtered_df = filtered_df.sort_values(by=st.session_state.sort_column, ascending=ascending)
+        
+        # Create a simplified dataframe for display
+        display_df = filtered_df[[
+            'job_name', 'job_creator', 'job_type_edited', 'max_players', 
+            'creation_date', 'last_updated', 'verification_type', 'original_url'
+        ]].copy()
+        
+        # Rename columns for better display
+        display_df.columns = [
+            'Job Name', 'Creator', 'Type', 'Max Players', 
+            'Created', 'Updated', 'Verification', 'URL'
+        ]
+        
+        # Convert URLs to clickable links
+        display_df['URL'] = display_df['URL'].apply(
+            lambda x: f'<a href="{x}" target="_blank">View</a>'
+        )
+        
+        # Display the table
+        st.write(display_df.to_html(escape=False), unsafe_allow_html=True)
+    else:
+        st.warning("No jobs match your filters. Try adjusting your search criteria.")
 
 # Footer
 st.markdown("---")
