@@ -42,9 +42,21 @@ ASSETS = {
     "logo_size": 30
 }
 
-# Minimal CSS for layout only (no colors)
+# CSS for button states and layout
 st.markdown("""
 <style>
+/* Selected filter buttons - use Streamlit's primary color */
+.stButton > button:active {
+    transform: scale(0.95);
+}
+
+/* Custom styling for selected filter buttons */
+.filter-selected {
+    border: 2px solid var(--primary-color);
+    background-color: var(--primary-color);
+    color: var(--foreground-color);
+}
+
 .streamlit-expanderHeader {
     background-color: #f8f8f8;
 }
@@ -192,6 +204,8 @@ with st.expander("Filters", expanded=st.session_state.filters_expanded):
     for i, job_type in enumerate(job_types):
         with job_type_cols[i % len(job_type_cols)]:
             is_selected = job_type in st.session_state.selected_job_types
+            # Add custom class for selected buttons
+            button_class = "filter-selected" if is_selected else ""
             if st.button(job_type, key=f"job_type_{job_type}", use_container_width=True):
                 if is_selected:
                     st.session_state.selected_job_types.remove(job_type)
@@ -207,6 +221,8 @@ with st.expander("Filters", expanded=st.session_state.filters_expanded):
     for i, verification_type in enumerate(verification_types):
         with verification_cols[i % len(verification_cols)]:
             is_selected = verification_type in st.session_state.selected_verification_types
+            # Add custom class for selected buttons
+            button_class = "filter-selected" if is_selected else ""
             if st.button(verification_type, key=f"verification_{verification_type}", use_container_width=True):
                 if is_selected:
                     st.session_state.selected_verification_types.remove(verification_type)
@@ -252,6 +268,8 @@ with st.expander("Filters", expanded=st.session_state.filters_expanded):
     for i, player_option in enumerate(player_options):
         with player_cols[i]:
             is_selected = player_option in st.session_state.selected_player_filters
+            # Add custom class for selected buttons
+            button_class = "filter-selected" if is_selected else ""
             if st.button(player_option, key=f"player_{player_option}", use_container_width=True):
                 if is_selected:
                     st.session_state.selected_player_filters.remove(player_option)
@@ -420,13 +438,19 @@ with tab1:
                     job_name = row['job_name']
                     job_creator = row['job_creator']
                     job_type = row['job_type_edited'] or row['job_type']
+                    max_players = row['max_players']
                     
                     # Create columns for job info
                     info_col1, info_col2 = st.columns([3, 1])
                     with info_col1:
                         st.markdown(f"### {job_name} by {job_creator}")
                     with info_col2:
-                        st.markdown(f"<p style='font-style: italic; text-align: right;'>{job_type}</p>", unsafe_allow_html=True)
+                        # Display job type and player count
+                        if max_players and max_players != "30":
+                            job_type_display = f"{job_type} | {max_players} players"
+                        else:
+                            job_type_display = job_type
+                        st.markdown(f"<p style='font-style: italic; text-align: right;'>{job_type_display}</p>", unsafe_allow_html=True)
                     
                     # Creation date, update date, and verification type
                     creation_date = format_date(row['creation_date'])
