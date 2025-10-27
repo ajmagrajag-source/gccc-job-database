@@ -7,3 +7,4 @@ wide_view = true
 
 [theme]
 primaryColor = "#fcaf17"
+textColor = "black"
