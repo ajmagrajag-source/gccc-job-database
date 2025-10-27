@@ -668,7 +668,7 @@ with tab3:
                 with cols[i % 3]:
                     # Responsive image
                     if pd.notna(row['job_image']) and row['job_image']:
-                        st.image(row['job_image'], width=200, use_container_width=True)
+                        st.image(row['job_image'], width=200, width=True)
                     
                     # Job name and creator
                     st.markdown(f"**{row['job_name']}** by {row['job_creator']}")
