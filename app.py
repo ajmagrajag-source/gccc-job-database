@@ -439,7 +439,45 @@ with tab1:
     if len(sorted_df) == 0:
         st.info("No jobs found matching your filters.")
     else:
-        for _, job in sorted_df.iterrows():
+        # Pagination
+        jobs_per_page = 30
+        total_jobs = len(sorted_df)
+        total_pages = (total_jobs + jobs_per_page - 1) // jobs_per_page  # Ceiling division
+        
+        # Initialize page number in session state
+        if 'current_page' not in st.session_state:
+            st.session_state.current_page = 1
+        
+        # Reset to page 1 if filters change and current page is out of range
+        if st.session_state.current_page > total_pages:
+            st.session_state.current_page = 1
+        
+        # Pagination controls
+        col_prev, col_page_info, col_next = st.columns([1, 2, 1])
+        
+        with col_prev:
+            if st.button("← Previous", disabled=(st.session_state.current_page <= 1), use_container_width=True):
+                st.session_state.current_page -= 1
+                st.rerun()
+        
+        with col_page_info:
+            st.markdown(f"<div style='text-align: center; padding: 0.5rem;'>Page {st.session_state.current_page} of {total_pages}</div>", unsafe_allow_html=True)
+        
+        with col_next:
+            if st.button("Next →", disabled=(st.session_state.current_page >= total_pages), use_container_width=True):
+                st.session_state.current_page += 1
+                st.rerun()
+        
+        st.divider()
+        
+        # Calculate start and end indices for current page
+        start_idx = (st.session_state.current_page - 1) * jobs_per_page
+        end_idx = min(start_idx + jobs_per_page, total_jobs)
+        
+        # Display only jobs for current page
+        page_df = sorted_df.iloc[start_idx:end_idx]
+        
+        for _, job in page_df.iterrows():
             col1, col2 = st.columns([1, 4])
             
             with col1:
