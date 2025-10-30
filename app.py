@@ -87,7 +87,7 @@ st.markdown("""
 
 # Custom job type order
 JOB_TYPE_ORDER = [
-    "GP", "Street", "Race", "Stunt Race", "Banger Race", "Off Road",
+    "GP and Street", "Race", "Stunt Race", "Banger Race", "Off Road",
     "Deathmatch", "King of the Hill", "Last Team Standing", "Parkour", "Other"
 ]
 
@@ -171,6 +171,32 @@ def sort_job_types(job_types):
             sorted_types.append(jt)
     return sorted_types
 
+# Get all unique verification types from the dataframe
+def get_all_verification_types(df):
+    """Extract all unique verification types from comma-separated values"""
+    all_verifications = set()
+    for verif in df['verification_type'].dropna():
+        # Split by comma and strip whitespace
+        types = [v.strip() for v in str(verif).split(',')]
+        all_verifications.update(types)
+    return sorted(list(all_verifications))
+
+# Check if job has a specific verification type
+def has_verification_type(verification_str, target_type):
+    """Check if a verification string contains a specific type"""
+    if pd.isna(verification_str):
+        return False
+    verifications = [v.strip() for v in str(verification_str).split(',')]
+    return target_type in verifications
+
+# Create verification badges HTML
+def create_verification_badges(verification_str):
+    """Create HTML for multiple verification badges"""
+    if pd.isna(verification_str):
+        return ""
+    verifications = [v.strip() for v in str(verification_str).split(',')]
+    return ''.join([f'<span class="badge badge-green">{v}</span>' for v in verifications])
+
 # Initialize session state
 if 'expanded_cards' not in st.session_state:
     st.session_state.expanded_cards = set()
@@ -178,6 +204,10 @@ if 'selected_job_types' not in st.session_state:
     st.session_state.selected_job_types = []
 if 'selected_max_players' not in st.session_state:
     st.session_state.selected_max_players = []
+if 'selected_verifications' not in st.session_state:
+    st.session_state.selected_verifications = []
+if 'search_term' not in st.session_state:
+    st.session_state.search_term = ""
 
 # Load data
 df = load_jobs()
@@ -209,8 +239,9 @@ tab1, tab2, tab3 = st.tabs(["📇 Card View", "📊 Table View", "🎲 Random Jo
 with st.sidebar:
     st.header("🔍 Search & Filters")
     
-    # Search
-    search_term = st.text_input("Search", placeholder="Job name, creator...")
+    # Search with strip() applied
+    search_input = st.text_input("Search", placeholder="Job name, creator...", value=st.session_state.search_term, key="search_input")
+    search_term = search_input.strip()  # Strip whitespace
     
     st.divider()
     
@@ -231,6 +262,26 @@ with st.sidebar:
                     st.session_state.selected_job_types.remove(job_type)
                 else:
                     st.session_state.selected_job_types.append(job_type)
+                st.rerun()
+    
+    st.divider()
+    
+    # Verification Type Filter
+    st.subheader("Verification Types")
+    verification_types = get_all_verification_types(df)
+    
+    # Create columns for verification buttons (2 columns)
+    num_cols = 2
+    cols = st.columns(num_cols)
+    for idx, verif_type in enumerate(verification_types):
+        with cols[idx % num_cols]:
+            is_selected = verif_type in st.session_state.selected_verifications
+            button_type = "primary" if is_selected else "secondary"
+            if st.button(verif_type, key=f"vt_{verif_type}", type=button_type, use_container_width=True):
+                if is_selected:
+                    st.session_state.selected_verifications.remove(verif_type)
+                else:
+                    st.session_state.selected_verifications.append(verif_type)
                 st.rerun()
     
     st.divider()
@@ -281,6 +332,8 @@ with st.sidebar:
     if st.button("Clear All Filters", use_container_width=True):
         st.session_state.selected_job_types = []
         st.session_state.selected_max_players = []
+        st.session_state.selected_verifications = []
+        st.session_state.search_term = ""
         # Reset sliders by forcing a rerun with default values
         if 'creation_slider' in st.session_state:
             del st.session_state['creation_slider']
@@ -303,6 +356,14 @@ if search_term:
 # Job type filter
 if st.session_state.selected_job_types:
     filtered_df = filtered_df[filtered_df['job_type_edited'].isin(st.session_state.selected_job_types)]
+
+# Verification type filter
+if st.session_state.selected_verifications:
+    # Filter jobs that have ANY of the selected verification types
+    mask = filtered_df['verification_type'].apply(
+        lambda x: any(has_verification_type(x, vt) for vt in st.session_state.selected_verifications)
+    )
+    filtered_df = filtered_df[mask]
 
 # Max players filter
 if st.session_state.selected_max_players:
@@ -394,11 +455,12 @@ with tab1:
                 # Creation date on second line
                 st.markdown(f"*Created: {format_date(job['creation_date'])}*")
                 
-                # Badges
+                # Badges with multiple verification types
+                verification_badges = create_verification_badges(job['verification_type'])
                 badge_html = f"""
                 <div style="margin: 0.5rem 0;">
                     <span class="badge badge-blue">{job['job_type_edited']}</span>
-                    <span class="badge badge-green">{job['verification_type']}</span>
+                    {verification_badges}
                 </div>
                 """
                 st.markdown(badge_html, unsafe_allow_html=True)
@@ -410,7 +472,7 @@ with tab1:
                 # Collapsible description
                 if pd.notna(job['job_description']) and job['job_description']:
                     card_id = f"card_{job['id']}"
-                    if st.button("📝 Description", key=f"btn_{job['id']}", use_container_width=False):
+                    if st.button("📄 Description", key=f"btn_{job['id']}", use_container_width=False):
                         if card_id in st.session_state.expanded_cards:
                             st.session_state.expanded_cards.remove(card_id)
                         else:
@@ -463,7 +525,7 @@ with tab2:
                 "Creator": st.column_config.TextColumn("Creator", width="small"),
                 "Type": st.column_config.TextColumn("Type", width="small"),
                 "Max Players": st.column_config.TextColumn("Max Players", width="small"),
-                "Verification": st.column_config.TextColumn("Verification", width="small"),
+                "Verification": st.column_config.TextColumn("Verification", width="medium"),
                 "Created": st.column_config.TextColumn("Created", width="small"),
                 "Updated": st.column_config.TextColumn("Updated", width="small"),
                 "GTALens": st.column_config.LinkColumn("GTALens", display_text="GTALens Link"),
@@ -478,57 +540,60 @@ with tab3:
     st.subheader("🎲 Random Job Selection")
     st.markdown(f"*Selecting from {len(filtered_df)} filtered jobs*")
     
-    random_count = st.slider(
-        "Number of random jobs",
-        min_value=1,
-        max_value=min(20, len(filtered_df)) if len(filtered_df) > 0 else 1,
-        value=min(5, len(filtered_df)) if len(filtered_df) > 0 else 1
-    )
-    
-    if st.button("🔀 Generate Random Selection", type="primary"):
-        if len(filtered_df) > 0:
-            st.session_state.random_jobs = filtered_df.sample(n=min(random_count, len(filtered_df)))
-        else:
-            st.warning("No jobs available with current filters!")
-    
-    st.divider()
-    
-    if 'random_jobs' in st.session_state and len(st.session_state.random_jobs) > 0:
-        st.markdown(f"### Random Selection ({len(st.session_state.random_jobs)} jobs)")
-        
-        for _, job in st.session_state.random_jobs.iterrows():
-            col1, col2 = st.columns([1, 4])
-            
-            with col1:
-                if pd.notna(job['job_image']):
-                    try:
-                        st.image(job['job_image'], use_container_width=True)
-                    except:
-                        st.write("🖼️")
-            
-            with col2:
-                max_players_text = f" ({job['max_players']} players)" if str(job['max_players']) != "30" else ""
-                st.markdown(f"### [{job['job_name']}]({job['original_url']}) by {job['job_creator']}{max_players_text}")
-                st.markdown(f"*Created: {format_date(job['creation_date'])}*")
-                
-                badge_html = f"""
-                <div style="margin: 0.5rem 0;">
-                    <span class="badge badge-blue">{job['job_type_edited']}</span>
-                    <span class="badge badge-green">{job['verification_type']}</span>
-                </div>
-                """
-                st.markdown(badge_html, unsafe_allow_html=True)
-                
-                if pd.notna(job['gta_lens_link']):
-                    st.markdown(f"🔗 [GTALens Link]({job['gta_lens_link']})")
-                
-                if pd.notna(job['job_description']) and job['job_description']:
-                    with st.expander("📝 Description"):
-                        st.write(job['job_description'])
-            
-            st.divider()
+    # Check if we have enough jobs for random selection
+    if len(filtered_df) < 2:
+        st.warning("⚠️ Not enough jobs to pick a random selection. Clear all filters first and try again.")
     else:
-        st.info("Click the button above to generate a random selection of jobs!")
+        random_count = st.slider(
+            "Number of random jobs",
+            min_value=1,
+            max_value=min(20, len(filtered_df)),
+            value=min(5, len(filtered_df))
+        )
+        
+        if st.button("🔀 Generate Random Selection", type="primary"):
+            st.session_state.random_jobs = filtered_df.sample(n=min(random_count, len(filtered_df)))
+        
+        st.divider()
+        
+        if 'random_jobs' in st.session_state and len(st.session_state.random_jobs) > 0:
+            st.markdown(f"### Random Selection ({len(st.session_state.random_jobs)} jobs)")
+            
+            for _, job in st.session_state.random_jobs.iterrows():
+                col1, col2 = st.columns([1, 4])
+                
+                with col1:
+                    if pd.notna(job['job_image']):
+                        try:
+                            st.image(job['job_image'], use_container_width=True)
+                        except:
+                            st.write("🖼️")
+                
+                with col2:
+                    max_players_text = f" ({job['max_players']} players)" if str(job['max_players']) != "30" else ""
+                    st.markdown(f"### [{job['job_name']}]({job['original_url']}) by {job['job_creator']}{max_players_text}")
+                    st.markdown(f"*Created: {format_date(job['creation_date'])}*")
+                    
+                    # Badges with multiple verification types
+                    verification_badges = create_verification_badges(job['verification_type'])
+                    badge_html = f"""
+                    <div style="margin: 0.5rem 0;">
+                        <span class="badge badge-blue">{job['job_type_edited']}</span>
+                        {verification_badges}
+                    </div>
+                    """
+                    st.markdown(badge_html, unsafe_allow_html=True)
+                    
+                    if pd.notna(job['gta_lens_link']):
+                        st.markdown(f"🔗 [GTALens Link]({job['gta_lens_link']})")
+                    
+                    if pd.notna(job['job_description']) and job['job_description']:
+                        with st.expander("📄 Description"):
+                            st.write(job['job_description'])
+                
+                st.divider()
+        else:
+            st.info("Click the button above to generate a random selection of jobs!")
 
 # Footer
 st.divider()
