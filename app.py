@@ -7,7 +7,7 @@ from datetime import datetime
 # Page config
 st.set_page_config(
     page_title="Rockstar Jobs Database",
-    page_icon="🎮",
+    page_icon="https://i.ibb.co/RKLBH26/GCCC-PS5-Gold.png",
     layout="wide"
 )
 
@@ -229,8 +229,12 @@ max_creation_year_full = int(df['creation_year'].max()) if df['creation_year'].n
 min_update_year_full = int(df['update_year'].min()) if df['update_year'].notna().any() else 2013
 max_update_year_full = int(df['update_year'].max()) if df['update_year'].notna().any() else 2025
 
-# Title
-st.title("🎮 Rockstar Jobs Database")
+# Title with image
+col_title_img, col_title_text = st.columns([1, 20])
+with col_title_img:
+    st.image("https://i.ibb.co/RKLBH26/GCCC-PS5-Gold.png", width=60)
+with col_title_text:
+    st.title("GTA Online Verified User Generated Jobs (PS4 / PS5)")
 
 # Tabs
 tab1, tab2, tab3 = st.tabs(["📇 Card View", "📊 Table View", "🎲 Random Jobs"])
@@ -257,7 +261,7 @@ with st.sidebar:
         with cols[idx % num_cols]:
             is_selected = job_type in st.session_state.selected_job_types
             button_type = "primary" if is_selected else "secondary"
-            if st.button(job_type, key=f"jt_{job_type}", type=button_type, use_container_width=True):
+            if st.button(job_type, key=f"jt_{job_type}", type=button_type):
                 if is_selected:
                     st.session_state.selected_job_types.remove(job_type)
                 else:
@@ -277,7 +281,7 @@ with st.sidebar:
         with cols[idx % num_cols]:
             is_selected = verif_type in st.session_state.selected_verifications
             button_type = "primary" if is_selected else "secondary"
-            if st.button(verif_type, key=f"vt_{verif_type}", type=button_type, use_container_width=True):
+            if st.button(verif_type, key=f"vt_{verif_type}", type=button_type):
                 if is_selected:
                     st.session_state.selected_verifications.remove(verif_type)
                 else:
@@ -295,7 +299,7 @@ with st.sidebar:
         with cols[idx]:
             is_selected = value in st.session_state.selected_max_players
             button_type = "primary" if is_selected else "secondary"
-            if st.button(label, key=f"mp_{value}", type=button_type, use_container_width=True):
+            if st.button(label, key=f"mp_{value}", type=button_type):
                 if is_selected:
                     st.session_state.selected_max_players.remove(value)
                 else:
@@ -329,7 +333,7 @@ with st.sidebar:
     st.divider()
     
     # Clear filters button
-    if st.button("Clear All Filters", use_container_width=True):
+    if st.button("Clear All Filters"):
         st.session_state.selected_job_types = []
         st.session_state.selected_max_players = []
         st.session_state.selected_verifications = []
@@ -456,7 +460,7 @@ with tab1:
         col_prev, col_page_info, col_next = st.columns([1, 2, 1])
         
         with col_prev:
-            if st.button("← Previous", disabled=(st.session_state.current_page <= 1), use_container_width=True):
+            if st.button("← Previous", disabled=(st.session_state.current_page <= 1)):
                 st.session_state.current_page -= 1
                 st.rerun()
         
@@ -464,7 +468,7 @@ with tab1:
             st.markdown(f"<div style='text-align: center; padding: 0.5rem;'>Page {st.session_state.current_page} of {total_pages}</div>", unsafe_allow_html=True)
         
         with col_next:
-            if st.button("Next →", disabled=(st.session_state.current_page >= total_pages), use_container_width=True):
+            if st.button("Next →", disabled=(st.session_state.current_page >= total_pages)):
                 st.session_state.current_page += 1
                 st.rerun()
         
@@ -483,7 +487,7 @@ with tab1:
             with col1:
                 if pd.notna(job['job_image']):
                     try:
-                        st.image(job['job_image'], use_container_width=True)
+                        st.image(job['job_image'], width='stretch')
                     except:
                         st.write("🖼️")
             
@@ -512,7 +516,7 @@ with tab1:
                 # Collapsible description
                 if pd.notna(job['job_description']) and job['job_description']:
                     card_id = f"card_{job['id']}"
-                    if st.button("📄 Description", key=f"btn_{job['id']}", use_container_width=False):
+                    if st.button("📄 Description", key=f"btn_{job['id']}"):
                         if card_id in st.session_state.expanded_cards:
                             st.session_state.expanded_cards.remove(card_id)
                         else:
@@ -605,7 +609,7 @@ with tab3:
                 with col1:
                     if pd.notna(job['job_image']):
                         try:
-                            st.image(job['job_image'], use_container_width=True)
+                            st.image(job['job_image'], width='stretch')
                         except:
                             st.write("🖼️")
                 
