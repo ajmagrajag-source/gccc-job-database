@@ -404,12 +404,14 @@ with tab1:
         sort_by = st.selectbox(
             "Sort by",
             ["Job Name", "Job Creator", "Job Type", "Creation Date", "Last Updated", "Scraped At"],
+            index=5,  # Default to "Scraped At" (index 5 in the list)
             key="card_sort"
         )
     with col_sort2:
         sort_order = st.selectbox(
             "Order",
             ["Ascending", "Descending"],
+            index=1,  # Default to "Descending" (index 1 in the list)
             key="card_order"
         )
     with col_count:
